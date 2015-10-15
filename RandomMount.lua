@@ -28,6 +28,15 @@ function RandomMount:new(o)
     -- initialize variables here
 	o.tItems = {} -- keep track of all the list items
 	o.wndSelectedListItem = nil -- keep track of which list item is currently selected
+	o.SelectAll = false
+	o.settings = {
+		    enabled = true,
+			knownMounts = {}
+		}
+	o.savedSettings = {
+		    enabled = true,
+			knownMounts = {}
+		}
 
     return o
 end
@@ -74,14 +83,13 @@ function RandomMount:OnDocLoaded()
 		-- e.g. Apollo.RegisterEventHandler("KeyDown", "OnKeyDown", self)
 		Apollo.RegisterSlashCommand("randommount", "OnRandomMountOn", self)
 		Apollo.RegisterEventHandler("Mount", "OnMount", self)
-
+		
 		-- Do additional Addon initialization here
 		--apply savedSettings to current settings
-
-		self.settings = {
-		    enabled = true,
-			knownMounts = {}
-		}
+		
+		if self.savedSettings == nil then
+			Print("true")
+		end
 		
 		self.settings = RandomMount:ShallowCopy(self.savedSettings)
 		self.savedSettings = nil
@@ -128,20 +136,21 @@ end
 
 
 function RandomMount:OnOK()
-	self.currentSettings= nil
+	for idx = 1, #self.tItems do
+		local currentItem = self.tItems[idx]
+	    local selectButton = currentItem:FindChild("SelectMountButton")
+		local isChecked = selectButton:IsChecked()
+		local mountSpellId = currentItem:GetData()
+		
+		self.settings.knownMounts[mountSpellId].isSelected = isChecked
+	end 	
+
 	self.wndMain:Close() -- hide the window
 end
 
 -- when the Cancel button is clicked
 function RandomMount:OnCancel()
 	self.wndMain:Close() -- hide the window
-end
-
---if canceled, escaped, or closed, restore previous settings
-function RandomMount:RestorePreviousSettings()
-	self.settings = RandomMount:ShallowCopy(self.currentSettings)
-	self.currentSettings = nil
-	
 end
 
 
@@ -153,23 +162,22 @@ function RandomMount:OnWindowClosed( wndHandler, wndControl )
 	self:DestroyItemList()
 end
 
-function RandomMount:SelectAllmountsToggle( wndHandler, wndControl, eMouseButton )
-	
-	local isChecked = wndControl:IsChecked()
-	
+
+
+function RandomMount:SelectAllmountsToggle(shouldCheck)	
 	for k,v in pairs(self.settings.knownMounts) do
-		self.settings.knownMounts[k].isSelected = isChecked 
+		self.settings.knownMounts[k].isSelected = shouldCheck
 	end
 	
-	for k,v in pairs(self.tItems) do
-		
-		test = getmetatable( self.tItems[k]:FindChild("SelectMountButton"))
-		--self.tItems[k].FindChild("SelectMountButton").SetCheck(isChecked)
-		
-		for k,v in pairs(test) do
-			Print(k,v)end
-	end
-	
+	self:PopulateItemList()	
+end
+
+function RandomMount:SelectAllmounts( wndHandler, wndControl, eMouseButton )
+	self:SelectAllmountsToggle(true)
+end
+
+function RandomMount:UnselectAllMounts( wndHandler, wndControl, eMouseButton )
+	self:SelectAllmountsToggle(false)
 end
 
 -----------------------------------------------------------------------------------------------
@@ -187,25 +195,12 @@ function RandomMount:PopulateItemList()
 	--Get mounts not already in list that are known
 	for idx = 1, #arMountList do
 		local tMountData = arMountList[idx]
-				
-		if tMountData.bIsKnown and not self.settings.knownMounts[tMountData.nSpellId] then
-			self.settings.knownMounts[tMountData.nSpellId] = {
-			strName = tMountData.strName, 
-			nSpellId = tMountData.nSpellId, 
-			icon = tMountData.splObject:GetIcon(),
-			isSelected = true
-			}
+		
+		if tMountData.bIsKnown then
+			self:AddItem(tMountData,idx)
 		end
 	end
-	
-	--add window items
-	idx = 1
 
-	for k,v in pairs(self.settings.knownMounts) do
-		self:AddItem(v,idx)
-		idx = idx +1
-	end
-	
 	-- now all the item are added, call ArrangeChildrenVert to list out the list items vertically
 	self.wndItemList:ArrangeChildrenVert()
 end
@@ -228,21 +223,35 @@ function RandomMount:AddItem(tMountData,idx)
 	local wndMount = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
 	
 	if wndMount ~= nil then
+		--store mount item for later
 		self.tItems[idx] = wndMount 
-
+		
+		--populate various list item fields
 		local SelectButton = wndMount:FindChild("SelectMountButton")
 		local mountSpellId = tMountData.nSpellId
-		local isSelected = tMountData.isSelected
+		local knownMount = self.settings.knownMounts[mountSpellId]
+		local isSelected = true
+		
+		if knownMount then
+			isSelected = knownMount.isSelected
+		end
 		
 		if SelectButton ~= nil then
 			SelectButton:SetCheck(isSelected)
 		end
 
 		wndMount:FindChild("MountName"):SetText(tMountData.strName)		
-		wndMount:FindChild("MountIcon"):SetSprite(tMountData.icon)
+		wndMount:FindChild("MountIcon"):SetSprite(tMountData.splObject:GetIcon())
 		
 		wndMount:SetData(mountSpellId)
-
+		
+		--add the mount to the saved mounts if not already there
+		if  not self.settings.knownMounts[mountSpellId] then
+			self.settings.knownMounts[mountSpellId] = {
+			isSelected = SelectButton:IsChecked()
+			}
+		end
+		
 	end
 end
 
@@ -256,8 +265,7 @@ end
 
 function RandomMount:OnRestore(eLevel,tSaveData)
 	if eLevel ~= GameLib.CodeEnumAddonSaveLevel.Character then return end
-	self.savedSettings = {}
-	
+		
 	if tSaveData then
 		for k,v in pairs(tSaveData) do
 			self.savedSettings[k] = v
@@ -299,7 +307,7 @@ end
 --Save as viable random mount
 function RandomMount:OnMountSelected( wndHandler, wndControl, eMouseButton )
 	adjustedMount = wndControl:GetParent():GetData()
-	self.settings.knownMounts[adjustedMount].isSelected = wndControl:IsChecked()
+	self.settings.knownMounts[adjustedMount].IsSelected = wndControl:IsChecked()
 end
 
 -----------------------------------------------------------------------------------------------
