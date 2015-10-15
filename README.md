@@ -1,6 +1,6 @@
 # Random Mount
 
-Random Mount is a Wildstar addon that allows a character to select from amonng their known mounts and then summon a randomly select mount, each time they mount.
+Random Mount is a Wildstar addon that allows a character to select from among their known mounts and then summon a randomly selected mount, each time they mount.
 
 ## Installation
 
