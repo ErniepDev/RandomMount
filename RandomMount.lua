@@ -31,11 +31,13 @@ function RandomMount:new(o)
 	o.SelectAll = false
 	o.settings = {
 		    enabled = true,
-			knownMounts = {}
+			knownMounts = {},
+			hoverBoardsOnly = false
 		}
 	o.savedSettings = {
 		    enabled = true,
-			knownMounts = {}
+			knownMounts = {},
+			hoverBoardsOnly = false
 		}
 
     return o
@@ -87,10 +89,6 @@ function RandomMount:OnDocLoaded()
 		-- Do additional Addon initialization here
 		--apply savedSettings to current settings
 		
-		if self.savedSettings == nil then
-			Print("true")
-		end
-		
 		self.settings = RandomMount:ShallowCopy(self.savedSettings)
 		self.savedSettings = nil
 	end
@@ -114,7 +112,10 @@ function RandomMount:OnRandomMountOn()
 	--save previous known mount settings
 	self.currentSettings = RandomMount:ShallowCopy(self.settings)
 		
-	self:SetupMainForm()	
+	self:SetupMainForm()
+			
+	-- populate the item list
+	self:PopulateItemList()		
 end
 
 
@@ -125,13 +126,16 @@ end
 function RandomMount:SetupMainForm()
 
 	local EnabledButton  = self.wndMain:FindChild("EnabledButton")
-	
+	local hoverBoardsOnlyButton  = self.wndMain:FindChild("HoverboardsOnly")
+
 	if EnabledButton ~= nil then
 		EnabledButton:SetCheck(self.settings.enabled)
 	end
 	
-	-- populate the item list
-	self:PopulateItemList()
+	if hoverBoardsOnlyButton  ~= nil then
+		hoverBoardsOnlyButton:SetCheck(self.settings.hoverBoardsOnly)
+	end
+	
 end
 
 
@@ -162,22 +166,34 @@ function RandomMount:OnWindowClosed( wndHandler, wndControl )
 	self:DestroyItemList()
 end
 
-
-
+--called by select all/none functions to reopulate mount list
 function RandomMount:SelectAllmountsToggle(shouldCheck)	
-	for k,v in pairs(self.settings.knownMounts) do
-		self.settings.knownMounts[k].isSelected = shouldCheck
-	end
 	
+	for idx = 1, #self.tItems do
+		local mountSpellId = self.tItems[idx]:GetData()
+		self.settings.knownMounts[mountSpellId].isSelected = shouldCheck
+	end
+
 	self:PopulateItemList()	
 end
 
+--function call for select all mounts button
 function RandomMount:SelectAllmounts( wndHandler, wndControl, eMouseButton )
 	self:SelectAllmountsToggle(true)
 end
 
+-- function call for select none button
 function RandomMount:UnselectAllMounts( wndHandler, wndControl, eMouseButton )
 	self:SelectAllmountsToggle(false)
+end
+
+--function call for hoverboards only button
+function RandomMount:OnHoverboardsOnlySelected( wndHandler, wndControl, eMouseButton )
+	local isButtonChecked = wndControl:IsChecked()
+
+	self.settings.hoverBoardsOnly = isButtonChecked
+
+	self:PopulateItemList()
 end
 
 -----------------------------------------------------------------------------------------------
@@ -188,16 +204,24 @@ function RandomMount:PopulateItemList()
 	-- make sure the item list is empty to start with
 	self:DestroyItemList()
 	
+	local idx = 0
+		
+	--show only hoverboards
+	local showOnlyHoverboards = self.settings.hoverBoardsOnly
+	
 	--all mounts
 	local arMountList = CollectiblesLib.GetMountList()
 	table.sort(arMountList, function(a,b) return (a.bIsKnown and not b.bIsKnown) or (a.bIsKnown == b.bIsKnown and a.strName < b.strName) end)
 	
 	--Get mounts not already in list that are known
-	for idx = 1, #arMountList do
-		local tMountData = arMountList[idx]
-		
+	for i = 1, #arMountList do
+		local tMountData = arMountList[i]
+
 		if tMountData.bIsKnown then
-			self:AddItem(tMountData,idx)
+			if not showOnlyHoverboards or (showOnlyHoverboards and tMountData.bIsHoverboard) then
+				idx = idx + 1
+				self:AddItem(tMountData,idx)
+			end
 		end
 	end
 
@@ -211,17 +235,16 @@ function RandomMount:DestroyItemList()
 	for idx,wnd in ipairs(self.tItems) do
 		wnd:Destroy()
 	end
-
 	-- clear the list item array
 	self.tItems = {}
-	self.wndSelectedListItem = nil
+	
 end
 
 -- add an item into the item list
 function RandomMount:AddItem(tMountData,idx)
 	-- load the window item for the list item
 	local wndMount = Apollo.LoadForm(self.xmlDoc, "ListItem", self.wndItemList, self)
-	
+
 	if wndMount ~= nil then
 		--store mount item for later
 		self.tItems[idx] = wndMount 
@@ -231,6 +254,7 @@ function RandomMount:AddItem(tMountData,idx)
 		local mountSpellId = tMountData.nSpellId
 		local knownMount = self.settings.knownMounts[mountSpellId]
 		local isSelected = true
+		local isHoverboard = tMountData.bIsHoverboard
 		
 		if knownMount then
 			isSelected = knownMount.isSelected
@@ -246,11 +270,14 @@ function RandomMount:AddItem(tMountData,idx)
 		wndMount:SetData(mountSpellId)
 		
 		--add the mount to the saved mounts if not already there
-		if  not self.settings.knownMounts[mountSpellId] then
+	
+		
 			self.settings.knownMounts[mountSpellId] = {
-			isSelected = SelectButton:IsChecked()
+			isSelected = SelectButton:IsChecked(),
+			isHoverboard = isHoverboard 
 			}
-		end
+		
+		
 		
 	end
 end
@@ -285,8 +312,10 @@ if self.settings.enabled == true then
 	
 	for k,v in pairs(self.settings.knownMounts) do
 		if v.isSelected then
-			count = count + 1
-			selectedMounts[count] = k
+			if not self.settings.hoverBoardsOnly or (self.settings.hoverBoardsOnly and v.isHoverboard) then 
+				count = count + 1
+				selectedMounts[count] = k
+			end
 		end
 	end
 	
