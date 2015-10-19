@@ -1,22 +1,20 @@
 -----------------------------------------------------------------------------------------------
 -- Client Lua Script for RandomMount
 -- Copyright (c) NCsoft. All rights reserved
+-- Author: MisterP
+-- Allows users to summon a random mount from among a pool of known mounts that they select
 -----------------------------------------------------------------------------------------------
  
 require "Window"
  
------------------------------------------------------------------------------------------------
--- RandomMount Module Definition
------------------------------------------------------------------------------------------------
+local VERSION = "1.1"
 local RandomMount = {} 
  
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
 -- e.g. local kiExampleVariableMax = 999
-local kcrSelectedText = ApolloColor.new("UI_BtnTextHoloPressedFlyby")
-local kcrNormalText = ApolloColor.new("UI_BtnTextHoloNormal")
- 
+local MIN_FORM_WIDTH =  475
 -----------------------------------------------------------------------------------------------
 -- Initialization
 -----------------------------------------------------------------------------------------------
@@ -32,12 +30,16 @@ function RandomMount:new(o)
 	o.settings = {
 		    enabled = true,
 			knownMounts = {},
-			hoverBoardsOnly = false
+			hoverBoardsOnly = false,
+			tAnchorPoints = {},
+			tAnchorOffsets = {}
 		}
 	o.savedSettings = {
 		    enabled = true,
 			knownMounts = {},
-			hoverBoardsOnly = false
+			hoverBoardsOnly = false,
+			tAnchorPoints = {},
+			tAnchorOffsets = {}
 		}
 
     return o
@@ -72,7 +74,7 @@ function RandomMount:OnDocLoaded()
 		if self.wndMain == nil then
 			Apollo.AddAddonErrorText(self, "Could not load the main window for some reason.")
 			return
-		end
+	end
 		
 		-- item list
 		self.wndItemList = self.wndMain:FindChild("ItemList")
@@ -115,7 +117,9 @@ function RandomMount:OnRandomMountOn()
 	self:SetupMainForm()
 			
 	-- populate the item list
-	self:PopulateItemList()		
+	self:PopulateItemList()	
+
+
 end
 
 
@@ -124,6 +128,13 @@ end
 -----------------------------------------------------------------------------------------------
 -- when the OK button is clicked
 function RandomMount:SetupMainForm()
+
+	if self.settings.tAnchorPoints then
+		self.wndMain:SetAnchorPoints(unpack(self.settings.tAnchorPoints))
+	end
+	if self.settings.tAnchorOffsets then
+		self.wndMain:SetAnchorOffsets(unpack(self.settings.tAnchorOffsets))
+	end
 
 	local EnabledButton  = self.wndMain:FindChild("EnabledButton")
 	local hoverBoardsOnlyButton  = self.wndMain:FindChild("HoverboardsOnly")
@@ -135,6 +146,10 @@ function RandomMount:SetupMainForm()
 	if hoverBoardsOnlyButton  ~= nil then
 		hoverBoardsOnlyButton:SetCheck(self.settings.hoverBoardsOnly)
 	end
+	
+	--set min/max form width/heights	
+	self.wndMain:SetSizingMinimum(475,280)
+	self.wndMain:SetSizingMaximum(475, Apollo.GetDisplaySize().nHeight)
 	
 end
 
@@ -194,6 +209,13 @@ function RandomMount:OnHoverboardsOnlySelected( wndHandler, wndControl, eMouseBu
 	self.settings.hoverBoardsOnly = isButtonChecked
 
 	self:PopulateItemList()
+end
+
+
+function RandomMount:PrintPairs(tObjToPrint)
+	for k,v in pairs(tobjToPrint) do
+		Print(k,v)
+	end
 end
 
 -----------------------------------------------------------------------------------------------
@@ -275,10 +297,7 @@ function RandomMount:AddItem(tMountData,idx)
 			self.settings.knownMounts[mountSpellId] = {
 			isSelected = SelectButton:IsChecked(),
 			isHoverboard = isHoverboard 
-			}
-		
-		
-		
+			}		
 	end
 end
 
@@ -287,6 +306,8 @@ end
 -----------------------------------------------------------------------------------------------
 function RandomMount:OnSave(eLevel)
 	if eLevel ~= GameLib.CodeEnumAddonSaveLevel.Character then return nil end
+	self.settings.tAnchorPoints = {self.wndMain:GetAnchorPoints()}
+	self.settings.tAnchorOffsets = {self.wndMain:GetAnchorOffsets()}
 	return self.settings
 end
 
