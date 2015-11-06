@@ -5,7 +5,6 @@ Random Mount is a Wildstar addon that allows a character to select from among th
 ## Installation
 
 This addon can be installed via it's curse gaming page or through [manual installation](http://support.curse.com/hc/en-us/articles/204270055--WildStar-Manually-Installing-AddOns). 
-## Usage
 
 ## Contributing
 
@@ -17,4 +16,4 @@ This addon can be installed via it's curse gaming page or through [manual instal
 
 ## License
 
-TODO: Write licenseCode released under the [MIT license](https://github.com/Tensre/RandomMount/blob/master/license). 
+Code released under the [MIT license](https://github.com/Tensre/RandomMount/blob/master/license). 
